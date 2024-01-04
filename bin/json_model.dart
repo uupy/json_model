@@ -73,12 +73,9 @@ bool generateModelClass(
       file = File(f.path);
       final paths = path.basename(f.path).split(".");
       final String fileName = paths.first;
-      if (paths.last.toLowerCase() != "json" || fileName.startsWith("_"))
-        return;
+      if (paths.last.toLowerCase() != "json" || fileName.startsWith("_")) return;
 
-      final dartFilePath = f.path
-          .replaceFirst(srcDir, distDir)
-          .replaceFirst(RegExp('.json', caseSensitive: false), ".dart");
+      final dartFilePath = f.path.replaceFirst(srcDir, distDir).replaceFirst(RegExp('.json', caseSensitive: false), ".dart");
 
       final map = json.decode(file.readAsStringSync()) as Map<String, dynamic>;
 
@@ -129,7 +126,7 @@ bool generateModelClass(
         if (key.startsWith("_")) return;
         if (key.startsWith("@")) {
           if (comments[v] != null) {
-            _writeComments(comments[v],fields);
+            _writeComments(comments[v], fields);
           }
           fields.write(key);
           fields.write(" ");
@@ -141,17 +138,17 @@ bool generateModelClass(
           if (optionalField || notNull) {
             key = key.substring(0, key.length - 1);
           }
-          final bool shouldAppendOptionalFlag =
-              !notNull && (optionalField || _nullable);
+          final bool shouldAppendOptionalFlag = !notNull && (optionalField || _nullable);
 
           if (comments[key] != null) {
-            _writeComments(comments[key],fields);
+            _writeComments(comments[key], fields);
           }
           if (!shouldAppendOptionalFlag) {
             fields.write('late ');
           }
-          fields.write(getDataType(v, importSet, fileName, tag));
-          if (shouldAppendOptionalFlag) {
+          var dataType = getDataType(v, importSet, fileName, tag);
+          fields.write(dataType);
+          if (shouldAppendOptionalFlag && dataType != 'dynamic') {
             fields.write('?');
           }
           fields.write(" ");
@@ -163,15 +160,7 @@ bool generateModelClass(
         fields.write("  ");
       });
 
-      var dist = replaceTemplate(tpl, [
-        fileName,
-        className,
-        className,
-        fields.toString(),
-        className,
-        className,
-        className
-      ]);
+      var dist = replaceTemplate(tpl, [fileName, className, className, fields.toString(), className, className, className]);
       // Insert the imports at the head of dart file.
       var _import = importSet.join(";\r\n");
       _import += _import.isEmpty ? "" : ";";
@@ -192,8 +181,8 @@ bool generateModelClass(
   return indexFile.isNotEmpty;
 }
 
-_writeComments(dynamic comments,StringBuffer sb){
-  final arr='$comments'.replaceAll('\r', '').split('\n');
+_writeComments(dynamic comments, StringBuffer sb) {
+  final arr = '$comments'.replaceAll('\r', '').split('\n');
   arr.forEach((element) {
     sb.writeln('// $element');
     sb.write('  ');
@@ -201,18 +190,19 @@ _writeComments(dynamic comments,StringBuffer sb){
 }
 
 String exportIndexFile(String p, String distDir, String indexFile) {
-  final relative = p.replaceFirst(distDir + path.separator, "");
+  var relative = p.replaceFirst(distDir + path.separator, "");
+  relative = relative.replaceAll(r'\', '/');
+
   indexFile += "export '$relative' ; \n";
   return indexFile;
 }
 
 String changeFirstChar(String str, [bool upper = true]) {
-  return (upper ? str[0].toUpperCase() : str[0].toLowerCase()) +
-      str.substring(1);
+  return (upper ? str[0].toUpperCase() : str[0].toLowerCase()) + str.substring(1);
 }
 
 bool isBuiltInType(String type) {
-  return ['int', 'num', 'string', 'double', 'map', 'list'].contains(type);
+  return ['int', 'num', 'string', 'double', 'map', 'list', 'dynamic'].contains(type);
 }
 
 String getDataType(v, Set<String> set, String current, String tag) {
@@ -234,11 +224,15 @@ String getDataType(v, Set<String> set, String current, String tag) {
       }
       return "List<${changeFirstChar(type)}>";
     } else if (v.startsWith(tag)) {
-      final fileName = changeFirstChar(v.substring(1), false);
-      if (fileName.toLowerCase() != current) {
-        set.add('import "$fileName.dart"');
+      final type = changeFirstChar(v.substring(1), false);
+      if (!isBuiltInType(type)) {
+        final fileName = changeFirstChar(v.substring(1), false);
+        if (fileName.toLowerCase() != current) {
+          set.add('import "$fileName.dart"');
+        }
+        return changeFirstChar(fileName);
       }
-      return changeFirstChar(fileName);
+      return type;
     } else if (v.startsWith("@")) {
       return v;
     }
