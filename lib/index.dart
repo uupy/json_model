@@ -223,7 +223,7 @@ String getDataType(v, Set<String> set, String current, String tag) {
   if (v is String && (isListType || v.startsWith(tag))) {
     // handle other type that is not built-in
     final typeName = v.substring(isListType ? 3 : 1);
-    final type = snakeCaseToCamelCase(typeName, !['string', 'map', 'list'].contains(typeName));
+    final type = snakeCaseToCamelCase(typeName, !['int', 'num', 'double', 'dynamic'].contains(typeName));
 
     if (snakeCaseToCamelCase(typeName) != snakeCaseToCamelCase(current) && !isBuiltInType(typeName)) {
       set.add('import "${camelCaseToSnakeCase(typeName)}.dart"');
