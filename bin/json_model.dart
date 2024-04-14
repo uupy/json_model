@@ -1,8 +1,10 @@
 import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
+
 import 'package:args/args.dart';
 import 'package:path/path.dart' as path;
+
 import 'build_runner.dart' as br;
 
 // Dart file template
@@ -75,7 +77,8 @@ bool generateModelClass(
       final String fileName = paths.first;
       if (paths.last.toLowerCase() != "json" || fileName.startsWith("_")) return;
 
-      final dartFilePath = f.path.replaceFirst(srcDir, distDir).replaceFirst(RegExp('.json', caseSensitive: false), ".dart");
+      final dartFilePath =
+          f.path.replaceFirst(srcDir, distDir).replaceFirst(RegExp('.json', caseSensitive: false), ".dart");
 
       final map = json.decode(file.readAsStringSync()) as Map<String, dynamic>;
 
@@ -98,7 +101,7 @@ bool generateModelClass(
       //generated class name
       String? className = meta['className'] as String?;
       if (className == null || className.isEmpty) {
-        className = fileName[0].toUpperCase() + fileName.substring(1);
+        className = snakeCaseToCamelCase(fileName);
       }
 
       //set ignore
@@ -160,7 +163,8 @@ bool generateModelClass(
         fields.write("  ");
       });
 
-      var dist = replaceTemplate(tpl, [fileName, className, className, fields.toString(), className, className, className]);
+      var dist =
+          replaceTemplate(tpl, [fileName, className, className, fields.toString(), className, className, className]);
       // Insert the imports at the head of dart file.
       var _import = importSet.join(";\r\n");
       _import += _import.isEmpty ? "" : ";";
@@ -206,40 +210,31 @@ bool isBuiltInType(String type) {
 }
 
 String getDataType(v, Set<String> set, String current, String tag) {
-  current = current.toLowerCase();
-  if (v is bool) {
-    return "bool";
-  } else if (v is num) {
-    return "num";
-  } else if (v is Map) {
-    return "Map<String,dynamic>";
-  } else if (v is List) {
-    return "List";
-  } else if (v is String) {
+  final isListType = v is String && v.startsWith("$tag[]");
+
+  if (v is bool) return "bool";
+
+  if (v is num) return "num";
+
+  if (v is Map) return "Map<String, dynamic>";
+
+  if (v is List) return "List";
+
+  if (v is String && v.startsWith("@")) return v;
+
+  if (v is String && (isListType || v.startsWith(tag))) {
     // handle other type that is not built-in
-    if (v.startsWith("$tag[]")) {
-      final type = changeFirstChar(v.substring(3), false);
-      if (type.toLowerCase() != current && !isBuiltInType(type)) {
-        set.add('import "$type.dart"');
-      }
-      return "List<${changeFirstChar(type)}>";
-    } else if (v.startsWith(tag)) {
-      final type = changeFirstChar(v.substring(1), false);
-      if (!isBuiltInType(type)) {
-        final fileName = changeFirstChar(v.substring(1), false);
-        if (fileName.toLowerCase() != current) {
-          set.add('import "$fileName.dart"');
-        }
-        return changeFirstChar(fileName);
-      }
-      return type;
-    } else if (v.startsWith("@")) {
-      return v;
+    final typeName = v.substring(isListType ? 3 : 1);
+    final type = snakeCaseToCamelCase(typeName, !['string', 'map', 'list'].contains(typeName));
+
+    if (snakeCaseToCamelCase(typeName) != snakeCaseToCamelCase(current) && !isBuiltInType(typeName)) {
+      set.add('import "${camelCaseToSnakeCase(typeName)}.dart"');
     }
-    return "String";
-  } else {
-    return "String";
+
+    return isListType ? "List<$type>" : type;
   }
+
+  return "String";
 }
 
 String replaceTemplate(String template, List<Object> params) {
@@ -257,4 +252,24 @@ String replaceTemplate(String template, List<Object> params) {
   }
 
   return template.replaceAllMapped("%s", replace);
+}
+
+String snakeCaseToCamelCase(String name, [bool upperFirstCase = true]) {
+  List<String> words = name.split('_');
+  String result = '';
+
+  for (var index in words.asMap().keys) {
+    result += changeFirstChar(words[index].toLowerCase(), upperFirstCase || index > 0);
+  }
+
+  return result;
+}
+
+String camelCaseToSnakeCase(String camelCaseStr) {
+  return camelCaseStr
+      .replaceAllMapped(
+        RegExp('([a-z])([A-Z])'),
+        (Match m) => '${m.group(1)}_${m.group(2)}',
+      )
+      .toLowerCase();
 }
