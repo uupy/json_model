@@ -259,7 +259,7 @@ String snakeCaseToCamelCase(String name, [bool upperFirstCase = true]) {
   String result = '';
 
   for (var index in words.asMap().keys) {
-    result += changeFirstChar(words[index].toLowerCase(), upperFirstCase || index > 0);
+    result += changeFirstChar(words[index], upperFirstCase || index > 0);
   }
 
   return result;
